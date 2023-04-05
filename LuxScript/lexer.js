@@ -13,7 +13,6 @@ module.exports = class Lexer {
     }
     lex() {
         const inputLength = this.input.length;
-        const tokens = [];
 
         while (this.position < inputLength) {
             const currentChar = this.input[this.position];
