@@ -55,12 +55,11 @@ module.exports = function run(code, file, code2) {
                             }
                         }
                     } else {
-                        if (fs.existsSync(tok[i][1]["value"])) {
-                            var file = fs.readFileSync(tok[i][1]["value"], "utf8");
-                        } else {
+                        if (!fs.existsSync(tok[i][1]["value"])) {
                             error[14]();
                             return false;
                         }
+                        let file = fs.readFileSync(tok[i][1]["value"], "utf8");
                         if (file === "") {
                             error[9]();
                             return false;
