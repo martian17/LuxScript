@@ -1,4 +1,3 @@
-var fs = require("fs");
 function untokenize(tokens) {
   let untokenizedCode = '';
   for (const token of tokens) {

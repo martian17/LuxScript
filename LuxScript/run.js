@@ -40,6 +40,26 @@ module.exports = function run(code, file, code2) {
 
     for (var i = 0; i < tok.length; i++) {
 
+        /*
+            EXPERIMENTAL
+        */
+        function func(functionName, leftparen, codestring) {
+            if (leftparen) {
+                if (tok[i][0].value === functionName) {
+                    if (tok[i][1].value === "LEFT_PAREN" && leftparen === true) {
+                        if (tok[i][tok.length]["value"]) {
+                            codestring();
+                        }
+                    }
+                }
+            }
+        }
+
+        func("test", true, function() {
+            console.log("test");
+        });
+        /**********************************/
+
         stringVariable();
         // Get
         if (tok[i][0]["value"] === "get") {
@@ -140,85 +160,73 @@ module.exports = function run(code, file, code2) {
         }
 
         // Fl
-        if (tok[i][0]["value"] === "fl") {
-            if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "variable") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["type"] === "IDENTIFIER") {
-                            tok[i][4]["value"] = variable[tok[i][4]["value"]];
-                        }
-                        let htmlData;
-                        if (fs.existsSync(tok[i][4]["value"])) {
-                            htmlData = fs.readFileSync(tok[i][4]["value"], "utf8");
-                        } else {
-                            error[24]();
-                        }
+        if (tok[i][0]["value"] === "fl" && tok[i][1]["value"] === "DOT" && tok[i][2]["value"] === "variable" && tok[i][3]["value"] === "LEFT_PAREN") {
+            if (tok[i][4]["type"] === "IDENTIFIER") {
+                tok[i][4]["value"] = variable[tok[i][4]["value"]];
+            }
+            let htmlData;
+            if (fs.existsSync(tok[i][4]["value"])) {
+                htmlData = fs.readFileSync(tok[i][4]["value"], "utf8");
+            } else {
+                error[24]();
+            }
 
-                        function regexEscape(str) {
-                            return str.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, "\\{{$1\\}}");
-                        }
-                        for (let key in variable) {
-                            let pattern = new RegExp(`{{\\s*${regexEscape(key)}\\s*}}`, "g");
-                            htmlData = htmlData.replace(pattern, variable[key]);
-                        }
-                        if (tok[i][5]["value"] === "COMMA") {
-                            if (tok[i][6]["value"] === "DEF") {
-                                if (tok[i][7]["value"] === "LEFT_PAREN") {
-                                    variable[tok[i][8]["value"]] = htmlData;
-                                }
-                            } else {
-                                if (tok[i][6]["type"] === "IDENTIFIER") {
-                                    tok[i][6]["value"] = variable[tok[i][6]["value"]];
-                                }
-                                fs.writeFileSync(tok[i][6]["value"], htmlData);
-                            }
-                        }
+            function regexEscape(str) {
+                return str.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, "\\{{$1\\}}");
+            }
+            for (let key in variable) {
+                let pattern = new RegExp(`{{\\s*${regexEscape(key)}\\s*}}`, "g");
+                htmlData = htmlData.replace(pattern, variable[key]);
+            }
+            if (tok[i][5]["value"] === "COMMA") {
+                if (tok[i][6]["value"] === "DEF") {
+                    if (tok[i][7]["value"] === "LEFT_PAREN") {
+                        variable[tok[i][8]["value"]] = htmlData;
                     }
+                } else {
+                    if (tok[i][6]["type"] === "IDENTIFIER") {
+                        tok[i][6]["value"] = variable[tok[i][6]["value"]];
+                    }
+                    fs.writeFileSync(tok[i][6]["value"], htmlData);
                 }
             }
         }
 
-        if (tok[i][0]["value"] === "const") {
-            if (tok[i][1]["value"] !== "") {
-                if (tok[i][2]["value"] === "ASSIGN") {
-                    variable[tok[i][1]["value"]] = tok[i][3]["value"];
-                    Object.defineProperty(variable, tok[i][1]["value"], {
-                        writable: false,
-                    });
-                }
-            }
+        if (tok[i][0]["value"] === "const" && tok[i][1]["value"] !== "" && tok[i][2]["value"] === "ASSIGN") {
+            variable[tok[i][1]["value"]] = tok[i][3]["value"];
+            Object.defineProperty(variable, tok[i][1]["value"], {
+                writable: false,
+            });
         }
 
         // Sets
-        if (tok[i][0]["value"] === "sets") {
-            if (tok[i][1]["value"] === "LEFT_BAR") {
-                let variablesInside = untokenize(tok[i]).slice(5, -1).split(",");
-                let lines = [];
+        if (tok[i][0]["value"] === "sets" && tok[i][1]["value"] === "LEFT_BAR") {
+            let variablesInside = untokenize(tok[i]).slice(5, -1).split(",");
+            let lines = [];
 
-                variablesInside.forEach(variable2 => {
-                    const input = variable2;
-                    const lexer = new Lexer(input);
-                    const tokens2 = lexer.lex();
+            variablesInside.forEach(variable2 => {
+                const input = variable2;
+                const lexer = new Lexer(input);
+                const tokens2 = lexer.lex();
 
-                    let line = [];
-                    tokens2.forEach(token => {
-                        if (token.type === 'NEWLINE') {
-                            lines.push(line);
-                            line = [];
-                        } else {
-                            line.push(token);
-                        }
-                    });
-
-                    if (line.length > 0) {
+                let line = [];
+                tokens2.forEach(token => {
+                    if (token.type === 'NEWLINE') {
                         lines.push(line);
+                        line = [];
+                    } else {
+                        line.push(token);
                     }
                 });
 
-                for (var i3 = 0; i3 < lines.length; i3++) {
-                    if (lines[i3][1]["value"] === "ASSIGN") {
-                        variable[lines[i3][0]["value"]] = lines[i3][2]["value"];
-                    }
+                if (line.length > 0) {
+                    lines.push(line);
+                }
+            });
+
+            for (var i3 = 0; i3 < lines.length; i3++) {
+                if (lines[i3][1]["value"] === "ASSIGN") {
+                    variable[lines[i3][0]["value"]] = lines[i3][2]["value"];
                 }
             }
         }
@@ -394,61 +402,49 @@ module.exports = function run(code, file, code2) {
 
         function stringVariable() {
             for (let j = 0; j < tok[i].length; j++) {
-                if (tok[i][j]["type"] === "STRING") {
-                    if (/\{(.+?)\}/.test(tok[i][j]["value"])) {
-                        tok[i][j]["value"] = tok[i][j]["value"].replace(/\{(.+?)\}/g, function(match, p1) {
-                            if (p1.includes(".")) {
-                                const p2 = p1.split(".");
-                                return variable[p2[0]][p2[1]] || "";
-                                /*
-                                } else if (p1.includes("[") and "]") {
-                                  use []
-                                */
-                            } else {
-                                return variable[p1] || "";
-                            }
-                        });
-                    }
+                if (tok[i][j]["type"] === "STRING" && /\{(.+?)\}/.test(tok[i][j]["value"])) {
+                    tok[i][j]["value"] = tok[i][j]["value"].replace(/\{(.+?)\}/g, function(match, p1) {
+                        if (p1.includes(".")) {
+                            const p2 = p1.split(".");
+                            return variable[p2[0]][p2[1]] || "";
+                            /*
+                            } else if (p1.includes("[") and "]") {
+                                use []
+                            */
+                        } else {
+                            return variable[p1] || "";
+                        }
+                    });
                 }
             }
         }
         stringVariable();
 
-        if (tok[i][0]["value"] === "def") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                variable[tok[i][2]["value"]] = variable[tok[i][2]["value"]];
-            }
-        }
-
         var functions = {};
         var functionName;
 
-        if (tok[i][0]["value"] === "DEF") {
-            if (tok[i][1]["value"] !== "") {
-                if (tok[i][2]["value"] === "LEFT_PAREN") {
-                    functionName = tok[i][1]["value"];
-                    // Add a new property to the functions object
-                    functions[functionName] = function(...FuncVar) {
-                        const tok12 = [...tok[i]]
-                        tok12.shift();
-                        tok12.shift();
-                        tok12.shift();
-                        tok12.pop();
-                        tok12.pop();
-                        tok12.pop();
-                        tok12.pop();
-                        tok12.pop();
-                        tok12.pop();
-                        const keys = untokenize(tok12).split(",");
-                        for (let i = 0; i < keys.length; i++) {
-                            variable[keys[i]] = FuncVar[0][i];
-                        }
-                        tok[i].splice(0, 5);
-                        run(untokenize(tok[i]));
-                    };
-                    runFunc();
+        if (tok[i][0]["value"] === "DEF" && tok[i][1]["value"] !== "" && tok[i][2]["value"] === "LEFT_PAREN") {
+            functionName = tok[i][1]["value"];
+            // Add a new property to the functions object
+            functions[functionName] = function(...FuncVar) {
+                const tok12 = [...tok[i]]
+                tok12.shift();
+                tok12.shift();
+                tok12.shift();
+                tok12.pop();
+                tok12.pop();
+                tok12.pop();
+                tok12.pop();
+                tok12.pop();
+                tok12.pop();
+                const keys = untokenize(tok12).split(",");
+                for (let i = 0; i < keys.length; i++) {
+                    variable[keys[i]] = FuncVar[0][i];
                 }
-            }
+                tok[i].splice(0, 5);
+                run(untokenize(tok[i]));
+            };
+            runFunc();
         }
 
         let xFunc;// boolean flag?
@@ -464,28 +460,24 @@ module.exports = function run(code, file, code2) {
         } else {
             yFunc = false;
         }
-        if (yFunc === true) {
-            if (xFunc === true) {
-                if (functions.hasOwnProperty(functionName)) { // check if the functions object has the property
-                    // lasttok[2] is the value inside the run function
-                    lastTok.shift();
-                    lastTok.shift();
-                    lastTok.shift();
-                    lastTok.shift();
-                    lastTok.pop();
-                    lastTok.pop();
-                    lastTok.forEach(function(lT) {
-                        const ltv = lT["value"];
-                        if (lT["type"] === "IDENTIFIER") {
-                            console.log(variable)
-                            console.log(variable[ltv])
-                        }
-                    });
-                    const arr = untokenize(lastTok).split(",");
-                    const plainArr = arr.map(str => str.replace(/"/g, ''));
-                    myFuncy(plainArr);
+        if (yFunc === true && xFunc === true && functions.hasOwnProperty(functionName)) {
+            // lasttok[2] is the value inside the run function
+            lastTok.shift();
+            lastTok.shift();
+            lastTok.shift();
+            lastTok.shift();
+            lastTok.pop();
+            lastTok.pop();
+            lastTok.forEach(function(lT) {
+                const ltv = lT["value"];
+                if (lT["type"] === "IDENTIFIER") {
+                    console.log(variable)
+                    console.log(variable[ltv])
                 }
-            }
+            });
+            const arr = untokenize(lastTok).split(",");
+            const plainArr = arr.map(str => str.replace(/"/g, ''));
+            myFuncy(plainArr);
         }
 
         function myFuncy(functionVariables) {
@@ -498,23 +490,17 @@ module.exports = function run(code, file, code2) {
         function loops() {
             if (tok[i][0]["value"] === "loop") {
                 if (tok[i][1]["value"] === "LEFT_PAREN") {
-                    if (tok[i][2]["value"] === "DEF") {
-                        if (tok[i][6]["value"] === "COMMA") {
-                            if (tok[i][7]["value"] !== "") {
-                                if (tok[i][8]["value"] === "COMMA") {
-                                    let num = tok[i][9]["value"];
-                                    for (var loop = tok[i][7]["value"]; loop < num; loop++) {
-                                        console.log(tok[i][4]["value"]);
-                                        variableName = tok[i][4]["value"];
-                                        variable[tok[i][4]["value"]] = {};
-                                        variable[tok[i][4]["value"]] = i;
-                                        const index = tok[i].findIndex((token) => token["value"] === "LEFT_BRACE");
-                                        const remainingTokens = tok[i].slice(index + 1);
-                                        tok[i] = remainingTokens;
-                                        run(untokenize(tok[i]));
-                                    }
-                                }
-                            }
+                    if (tok[i][2]["value"] === "DEF" && tok[i][6]["value"] === "COMMA" && tok[i][7]["value"] !== "" && tok[i][8]["value"] === "COMMA") {
+                        let num = tok[i][9]["value"];
+                        for (var loop = tok[i][7]["value"]; loop < num; loop++) {
+                            console.log(tok[i][4]["value"]);
+                            variableName = tok[i][4]["value"];
+                            variable[tok[i][4]["value"]] = {};
+                            variable[tok[i][4]["value"]] = i;
+                            const index = tok[i].findIndex((token) => token["value"] === "LEFT_BRACE");
+                            const remainingTokens = tok[i].slice(index + 1);
+                            tok[i] = remainingTokens;
+                            run(untokenize(tok[i]));
                         }
                     }
                 } else if (tok[i][1]["value"] === "LEFT_BRACE") {
@@ -536,13 +522,9 @@ module.exports = function run(code, file, code2) {
 
         // Change value of variable with variable name
         if (tok[i][0]["value"] === variableName) {
-            if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "split") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        variable[tok[i][0]["value"]] = variable[tok[i][0]["value"]].split(tok[i][4]["value"]);
-                        variableName = String(Object.keys(variable));
-                    }
-                }
+            if (tok[i][1]["value"] === "DOT" && tok[i][2]["value"] === "split" && tok[i][3]["value"] === "LEFT_PAREN") {
+                variable[tok[i][0]["value"]] = variable[tok[i][0]["value"]].split(tok[i][4]["value"]);
+                variableName = String(Object.keys(variable));
             }
             const varValue = variable[tok[i][0]["value"]];
             switch (tok[i][1]["value"]) {
@@ -609,22 +591,20 @@ module.exports = function run(code, file, code2) {
             }
         }
 
-        if (tok[i][0]["value"] === "bin") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                // Replace "binary code here" with your binary code string
-                const binaryCode = "binary code here";
-                const binaryBuffer = Buffer.from(binaryCode, 'binary');
+        if (tok[i][0]["value"] === "bin" && tok[i][1]["value"] === "LEFT_PAREN") {
+            // Replace "binary code here" with your binary code string
+            const binaryCode = "binary code here";
+            const binaryBuffer = Buffer.from(binaryCode, 'binary');
 
-                // Execute the binary code using the "exec" method
-                exec(binaryBuffer, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`Error executing binary code: ${error}`);
-                        return;
-                    }
-                    console.log(`Standard output: ${stdout}`);
-                    console.error(`Standard error: ${stderr}`);
-                });
-            }
+            // Execute the binary code using the "exec" method
+            exec(binaryBuffer, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`Error executing binary code: ${error}`);
+                    return;
+                }
+                console.log(`Standard output: ${stdout}`);
+                console.error(`Standard error: ${stderr}`);
+            });
         }
 
         /*
@@ -649,181 +629,173 @@ module.exports = function run(code, file, code2) {
             let documentaddscript;
             let documentlang;
 
-            if (tok[0]["value"] === "DOCUMENT") {
-                if (tok[1]["value"] === "DOT") {
-                    const dom = new JSDOM();
-                    const document = dom.window.document;
+            if (tok[0]["value"] === "DOCUMENT" && tok[1]["value"] === "DOT") {
+                const dom = new JSDOM();
+                const document = dom.window.document;
 
-                    // Checking if the document is used.
-                    if (tok[2]["value"] === "title" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (tok[4]["type"] === "IDENTIFIER") {
-                            documenttitle = variable[tok[4]["value"]];
+                // Checking if the document is used.
+                if (tok[2]["value"] === "title" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (tok[4]["type"] === "IDENTIFIER") {
+                        documenttitle = variable[tok[4]["value"]];
+                    } else {
+                        documenttitle = tok[4]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "doctype" && tok[3]["value"] === "LEFT_PAREN") {
+                    documentdoctype = "";
+                }
+
+                if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "DOT" && tok[4]["value"] == "head" && tok[5]["value"] == "LEFT_PAREN") {
+                    if (tok[6]["type"] === "IDENTIFIER") {
+                        documentaddhtmlhead = variable[tok[6]["value"]];
+                    } else {
+                        documentaddhtmlhead = tok[6]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "DOT" && tok[4]["value"] == "body" && tok[5]["value"] == "LEFT_PAREN") {
+                    if (tok[6]["type"] === "IDENTIFIER") {
+                        documentaddhtmlbody = variable[tok[6]["value"]];
+                    } else {
+                        documentaddhtmlbody = tok[6]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (tok[4]["type"] === "IDENTIFIER") {
+                        documentaddhtml = variable[tok[4]["value"]];
+                    } else {
+                        documentaddhtml = tok[4]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "addcss" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (tok[4]["type"] === "IDENTIFIER") {
+                        documentaddcss = variable[tok[4]["value"]];
+                    } else {
+                        documentaddcss = tok[4]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "addscript" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (tok[4]["type"] === "IDENTIFIER") {
+                        documentaddscript = variable[tok[4]["value"]];
+                    } else {
+                        documentaddscript = tok[4]["value"];
+                    }
+                }
+
+                if (tok[2]["value"] === "lang" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (tok[4]["type"] === "IDENTIFIER") {
+                        documentlang = variable[tok[4]["value"]];
+                    } else {
+                        documentlang = tok[4]["value"];
+                    }
+                }
+
+                // Executing the document.
+                if (tok[2]["value"] === "create" && tok[3]["value"] === "LEFT_PAREN") {
+                    let html = document.documentElement.outerHTML;
+                    if (typeof documentaddhtml !== 'undefined') {
+                        dom.window.document.innerHTML = documentaddhtml;
+                    }
+                    if (typeof documentaddhtmlbody !== 'undefined') {
+                        dom.window.document.body.innerHTML = documentaddhtmlbody;
+                    }
+                    if (typeof documentaddhtmlhead !== 'undefined') {
+                        dom.window.document.head.innerHTML = documentaddhtmlhead;
+                    }
+                    if (typeof documenttitle !== 'undefined') {
+                        document.title = documenttitle;
+                    }
+                    if (typeof documentlang !== 'undefined') {
+                        document.documentElement.setAttribute("lang", documentlang);
+                        html = dom.serialize();
+                    }
+                    if (typeof documentaddcss !== 'undefined') {
+                        const style = document.createElement('style');
+                        style.textContent = documentaddcss;
+                        document.head.appendChild(style);
+                    }
+                    if (typeof documentaddscript !== 'undefined') {
+                        const script = document.createElement('script');
+                        script.textContent = documentaddscript;
+                        document.head.appendChild(script);
+                    }
+                    if (typeof documentdoctype !== 'undefined') {
+                        html = "<!DOCTYPE html>" + document.documentElement.outerHTML;
+                    }
+                    const formattedHtml = prettier.format(html, {
+                        parser: "html"
+                    });
+
+                    if (tok[4] && tok[4]["value"] !== "RIGHT_PAREN") {
+                        if (tok[4]["value"].endsWith(".html")) {
+                            fs.writeFileSync(dir + "\\" + tok[4]["value"], formattedHtml);
                         } else {
-                            documenttitle = tok[4]["value"];
+                            fs.writeFileSync(dir + "\\" + tok[4]["value"] + ".html", formattedHtml);
                         }
+                    } else {
+                        fs.writeFileSync(dir + "\\LuxScript.html", formattedHtml);
                     }
 
-                    if (tok[2]["value"] === "doctype" && tok[3]["value"] === "LEFT_PAREN") {
-                        documentdoctype = "";
+
+
+                } else if (tok[2]["value"] === "extract" && tok[3]["value"] === "LEFT_PAREN") {
+                    if (typeof documentaddhtml !== 'undefined') {
+                        dom.window.document.body.innerHTML = documentaddhtml;
                     }
-
-                    if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "DOT" && tok[4]["value"] == "head" && tok[5]["value"] == "LEFT_PAREN") {
-                        if (tok[6]["type"] === "IDENTIFIER") {
-                            documentaddhtmlhead = variable[tok[6]["value"]];
-                        } else {
-                            documentaddhtmlhead = tok[6]["value"];
-                        }
+                    if (typeof documentaddhtmlbody !== 'undefined') {
+                        dom.window.document.body.innerHTML = documentaddhtmlbody;
                     }
-
-                    if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "DOT" && tok[4]["value"] == "body" && tok[5]["value"] == "LEFT_PAREN") {
-                        if (tok[6]["type"] === "IDENTIFIER") {
-                            documentaddhtmlbody = variable[tok[6]["value"]];
-                        } else {
-                            documentaddhtmlbody = tok[6]["value"];
-                        }
+                    if (typeof documentaddhtmlhead !== 'undefined') {
+                        dom.window.document.head.innerHTML = documentaddhtmlhead;
                     }
-
-                    if (tok[2]["value"] === "addhtml" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (tok[4]["type"] === "IDENTIFIER") {
-                            documentaddhtml = variable[tok[4]["value"]];
-                        } else {
-                            documentaddhtml = tok[4]["value"];
-                        }
+                    if (typeof documenttitle !== 'undefined') {
+                        document.title = documenttitle;
                     }
-
-                    if (tok[2]["value"] === "addcss" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (tok[4]["type"] === "IDENTIFIER") {
-                            documentaddcss = variable[tok[4]["value"]];
-                        } else {
-                            documentaddcss = tok[4]["value"];
-                        }
+                    if (typeof documentaddcss !== 'undefined') {
+                        const style = document.createElement('style');
+                        style.textContent = documentaddcss;
+                        document.head.appendChild(style);
                     }
-
-                    if (tok[2]["value"] === "addscript" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (tok[4]["type"] === "IDENTIFIER") {
-                            documentaddscript = variable[tok[4]["value"]];
-                        } else {
-                            documentaddscript = tok[4]["value"];
-                        }
+                    if (typeof documentaddscript !== 'undefined') {
+                        const script = document.createElement('script');
+                        script.textContent = documentaddscript;
+                        document.head.appendChild(script);
                     }
+                    const html = document.documentElement.outerHTML;
+                    const formattedHtml = prettier.format(html, {
+                        parser: "html"
+                    });
 
-                    if (tok[2]["value"] === "lang" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (tok[4]["type"] === "IDENTIFIER") {
-                            documentlang = variable[tok[4]["value"]];
-                        } else {
-                            documentlang = tok[4]["value"];
-                        }
+                    if (tok[6]["type"] === "IDENTIFIER") {
+                        var xx = true;
                     }
-
-                    // Executing the document.
-                    if (tok[2]["value"] === "create" && tok[3]["value"] === "LEFT_PAREN") {
-                        let html = document.documentElement.outerHTML;
-                        if (typeof documentaddhtml !== 'undefined') {
-                            dom.window.document.innerHTML = documentaddhtml;
-                        }
-                        if (typeof documentaddhtmlbody !== 'undefined') {
-                            dom.window.document.body.innerHTML = documentaddhtmlbody;
-                        }
-                        if (typeof documentaddhtmlhead !== 'undefined') {
-                            dom.window.document.head.innerHTML = documentaddhtmlhead;
-                        }
-                        if (typeof documenttitle !== 'undefined') {
-                            document.title = documenttitle;
-                        }
-                        if (typeof documentlang !== 'undefined') {
-                            document.documentElement.setAttribute("lang", documentlang);
-                            html = dom.serialize();
-                        }
-                        if (typeof documentaddcss !== 'undefined') {
-                            const style = document.createElement('style');
-                            style.textContent = documentaddcss;
-                            document.head.appendChild(style);
-                        }
-                        if (typeof documentaddscript !== 'undefined') {
-                            const script = document.createElement('script');
-                            script.textContent = documentaddscript;
-                            document.head.appendChild(script);
-                        }
-                        if (typeof documentdoctype !== 'undefined') {
-                            html = "<!DOCTYPE html>" + document.documentElement.outerHTML;
-                        }
-                        const formattedHtml = prettier.format(html, {
-                            parser: "html"
-                        });
-
-                        if (tok[4] && tok[4]["value"] !== "RIGHT_PAREN") {
-                            if (tok[4]["value"].endsWith(".html")) {
-                                fs.writeFileSync(dir + "\\" + tok[4]["value"], formattedHtml);
-                            } else {
-                                fs.writeFileSync(dir + "\\" + tok[4]["value"] + ".html", formattedHtml);
-                            }
-                        } else {
-                            fs.writeFileSync(dir + "\\LuxScript.html", formattedHtml);
-                        }
-
-
-
-                    } else if (tok[2]["value"] === "extract" && tok[3]["value"] === "LEFT_PAREN") {
-                        if (typeof documentaddhtml !== 'undefined') {
-                            dom.window.document.body.innerHTML = documentaddhtml;
-                        }
-                        if (typeof documentaddhtmlbody !== 'undefined') {
-                            dom.window.document.body.innerHTML = documentaddhtmlbody;
-                        }
-                        if (typeof documentaddhtmlhead !== 'undefined') {
-                            dom.window.document.head.innerHTML = documentaddhtmlhead;
-                        }
-                        if (typeof documenttitle !== 'undefined') {
-                            document.title = documenttitle;
-                        }
-                        if (typeof documentaddcss !== 'undefined') {
-                            const style = document.createElement('style');
-                            style.textContent = documentaddcss;
-                            document.head.appendChild(style);
-                        }
-                        if (typeof documentaddscript !== 'undefined') {
-                            const script = document.createElement('script');
-                            script.textContent = documentaddscript;
-                            document.head.appendChild(script);
-                        }
-                        const html = document.documentElement.outerHTML;
-                        const formattedHtml = prettier.format(html, {
-                            parser: "html"
-                        });
-
-                        if (tok[6]["type"] === "IDENTIFIER") {
-                            var xx = true;
-                        }
-                        if (xx === true) {
-                            variable[tok[6]["value"]] = formattedHtml;
-                        }
+                    if (xx === true) {
+                        variable[tok[6]["value"]] = formattedHtml;
                     }
                 }
             }
         }
 
         // Convertion
-        if (tok[i][0]["value"] === "string") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                variable[tok[i][2]["value"]] = String(variable[tok[i][2]["value"]]);
-            }
+        if (tok[i][0]["value"] === "string" && tok[i][1]["value"] === "LEFT_PAREN") {
+            variable[tok[i][2]["value"]] = String(variable[tok[i][2]["value"]]);
         }
-        if (tok[i][0]["value"] === "int") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                if (/^\d+$/.test(variable[tok[i][2]["value"]])) {
-                    variable[tok[i][2]["value"]] = Number(variable[tok[i][2]["value"]]);
-                } else {
-                    error[21]();
-                    return false;
-                }
+        if (tok[i][0]["value"] === "int" && tok[i][1]["value"] === "LEFT_PAREN") {
+            if (/^\d+$/.test(variable[tok[i][2]["value"]])) {
+                variable[tok[i][2]["value"]] = Number(variable[tok[i][2]["value"]]);
+            } else {
+                error[21]();
+                return false;
             }
         }
 
         // Scope
-        if (tok[i][0]["value"] === "scope") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                run(`set ${tok[i][2]["value"]} = ${tok[i][2]["value"]};`);
-            }
+        if (tok[i][0]["value"] === "scope" && tok[i][1]["value"] === "LEFT_PAREN") {
+            run(`set ${tok[i][2]["value"]} = ${tok[i][2]["value"]};`);
         }
 
         // Print
@@ -850,25 +822,17 @@ module.exports = function run(code, file, code2) {
                 }
 
                 // Json
-                if (tok[i][3] && tok[i][3]["value"] === "DOT") {
-                    if (tok[i][4]["value"] !== "") {
-                        eval(`console.log(variable['${tok[i][2]["value"]}'].${tok[i][4]["value"]})`);
-                        break;
-                    }
-                } else if (tok[i][3] && tok[i][3]["value"] === "LEFT_BAR") {
-                    if (tok[i][4]["value"] !== "") {
-                        eval(`console.log(variable['${tok[i][2]["value"]}']["${tok[i][4]["value"]}"])`);
-                        break;
-                    }
+                if (tok[i][3] && tok[i][3]["value"] === "DOT" && tok[i][4]["value"] !== "") {
+                    eval(`console.log(variable['${tok[i][2]["value"]}'].${tok[i][4]["value"]})`);
+                    break;
+                } else if (tok[i][3] && tok[i][3]["value"] === "LEFT_BAR" && tok[i][4]["value"] !== "") {
+                    eval(`console.log(variable['${tok[i][2]["value"]}']["${tok[i][4]["value"]}"])`);
+                    break;
                 }
 
                 // Date
-                if (tok[i][2]["value"] === "NEW") {
-                    if (tok[i][3]["value"] === "date") {
-                        if (tok[i][4]["value"] === "LEFT_PAREN") {
-                            console.log(new Date());
-                        }
-                    }
+                if (tok[i][2]["value"] === "NEW" && tok[i][3]["value"] === "date" && tok[i][4]["value"] === "LEFT_PAREN") {
+                    console.log(new Date());
                 }
                 if (tok[i][2]["type"] === "BOOLEAN") {
                     console.log(Boolean(tok[i][2]["value"]))
@@ -881,361 +845,220 @@ module.exports = function run(code, file, code2) {
                     } else {
                         console.log(variable[tok[i][2]["value"]]);
                     }
-                }
-                if (tok[i][2]["type"] === "STRING" || tok[i][2]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
+                } else if (tok[i][2]["type"] === "STRING" || tok[i][2]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
                     console.log(tok[i][2]["value"]);
                 }
             }
             if (tok[i][1]["value"] === "DOT") {
 
-                if (tok[i][2]["value"] === "error") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.error(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
-                                    console.error(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "error" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.error(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
+                        console.error(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "color") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "COMMA") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    tok[i][4]["value"] = variable[tok[i][4]["value"]]
-                                }
-                                if (tok[i][6]["type"] === "IDENTIFIER") {
-                                    tok[i][6]["value"] = variable[tok[i][6]["value"]]
-                                }
-                                console.log(`\x1b[${tok[i][4]["value"]}m%s\x1b[0m`, tok[i][6]["value"]);
-                            }
-                        }
+                if (tok[i][2]["value"] === "color" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "COMMA") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        tok[i][4]["value"] = variable[tok[i][4]["value"]]
+                    }
+                    if (tok[i][6]["type"] === "IDENTIFIER") {
+                        tok[i][6]["value"] = variable[tok[i][6]["value"]]
+                    }
+                    console.log(`\x1b[${tok[i][4]["value"]}m%s\x1b[0m`, tok[i][6]["value"]);
+                }
+                if (tok[i][2]["value"] === "link" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.log('\u001b[33m%s\u001b[0m', variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
+                        console.log('%s', tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "link") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.log('\u001b[33m%s\u001b[0m', variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
-                                    console.log('%s', tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "stdout" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        process.stdout.write(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
+                        process.stdout.write(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "stdout") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    process.stdout.write(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][2]["type"] === "NUMBER") {
-                                    process.stdout.write(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "warn" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.warn(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.warn(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "warn") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.warn(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.warn(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "assert" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.assert(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.assert(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "assert") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.assert(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.assert(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "count" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    console.count(tok[i][4]["value"]);
+                }
+                if (tok[i][2]["value"] === "countreset" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.countReset(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.countReset(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "count") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                console.count(tok[i][4]["value"]);
-                            }
-                        }
+                if (tok[i][2]["value"] === "debug" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.debug(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.debug(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "countreset") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.countReset(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.countReset(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "dir" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.dir(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.dir(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "debug") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.debug(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.debug(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "dirxml" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.dirxml(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.dirxml(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "dir") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.dir(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.dir(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "group" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.group(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.group(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "dirxml") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.dirxml(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.dirxml(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "info" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.info(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.info(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "group") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.group(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.group(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "groupcollapsed" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.groupCollapsed(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.groupCollapsed(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "info") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.info(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.info(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "profile" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.profile(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.profile(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "groupcollapsed") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.groupCollapsed(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.groupCollapsed(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "profileend" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.profileEnd(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.profileEnd(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "profile") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.profile(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.profile(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "table" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.table(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.table(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "profileend") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.profileEnd(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.profileEnd(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "time" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.time(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.time(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "table") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.table(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.table(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "timeend" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.timeEnd(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.timeEnd(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "time") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.time(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.time(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "timelog" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.timeLog(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.timeLog(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "timeend") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.timeEnd(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.timeEnd(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "timestamp" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.timeStamp(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.timeStamp(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "timelog") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.timeLog(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.timeLog(tok[i][4]["value"]);
-                                }
-                            }
-                        }
+                if (tok[i][2]["value"] === "trace" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4] !== "" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        console.trace(variable[tok[i][4]["value"]])
+                    }
+                    if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
+                        console.trace(tok[i][4]["value"]);
                     }
                 }
-                if (tok[i][2]["value"] === "timestamp") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.timeStamp(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.timeStamp(tok[i][4]["value"]);
-                                }
-                            }
-                        }
-                    }
-                }
-                if (tok[i][2]["value"] === "trace") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4] !== "") {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][4]["type"] === "IDENTIFIER") {
-                                    console.trace(variable[tok[i][4]["value"]])
-                                }
-                                if (tok[i][4]["type"] === "STRING" || tok[i][4]["type"] === "STRINGVAR" || tok[i][4]["type"] === "NUMBER") {
-                                    console.trace(tok[i][4]["value"]);
-                                }
-                            }
-                        }
-                    }
-                }
-                if (tok[i][2]["value"] === "clear") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["value"] === "RIGHT_PAREN") {
-                            console.clear();
-                        }
-                    }
+                if (tok[i][2]["value"] === "clear" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][4]["value"] === "RIGHT_PAREN") {
+                    console.clear();
                 }
             }
         }
 
         // Eval     
-        if (tok[i][0]["value"] === "exe") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                tok[i].shift();
-                tok[i].shift();
-                if (tok[i][0]["type"] === "IDENTIFIER") {
-                    tok[i][0]["value"] = variable[tok[i][0]["value"]];
-                }
-                const input = tok[i];
-                const lexer = new Lexer(input);
-                const tokens = lexer.lex();
-                run(untokenize(tok[i]));
+        if (tok[i][0]["value"] === "exe" && tok[i][1]["value"] === "LEFT_PAREN") {
+            tok[i].shift();
+            tok[i].shift();
+            if (tok[i][0]["type"] === "IDENTIFIER") {
+                tok[i][0]["value"] = variable[tok[i][0]["value"]];
             }
+            const input = tok[i];
+            const lexer = new Lexer(input);
+            const tokens = lexer.lex();
+            run(untokenize(tok[i]));
         }
 
         // Shell command
-        if (tok[i][0]["value"] === "exec") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                if (tok[i][2]["type"] === "IDENTIFIER") {
-                    tok[i][2]["value"] = variable[tok[i][2]["value"]];
-                }
-                exec(tok[i][2]["value"], (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`exec error: ${error}`);
-                        return;
-                    }
-                    if (stdout) {
-                        console.log(stdout);
-                    }
-                    if (stderr) {
-                        console.error(stderr);
-                    }
-                });
+        if (tok[i][0]["value"] === "exec" && tok[i][1]["value"] === "LEFT_PAREN") {
+            if (tok[i][2]["type"] === "IDENTIFIER") {
+                tok[i][2]["value"] = variable[tok[i][2]["value"]];
             }
+            exec(tok[i][2]["value"], (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+                if (stdout) {
+                    console.log(stdout);
+                }
+                if (stderr) {
+                    console.error(stderr);
+                }
+            });
         }
 
         // Html
@@ -1246,8 +1069,8 @@ module.exports = function run(code, file, code2) {
                 } else {
                     var value = tok[i][2]["value"];
                 }
-                fs.writeFileSync("./LuxScript/index.html", value);
-                exec("npx electron ./LuxScript/main.ejs.js", (error, stdout, stderr) => {
+                fs.writeFileSync("./LuxScript/WebGui/index.html", value);
+                exec("npx electron ./LuxScript/WebGui/main.ejs.js", (error, stdout, stderr) => {
                     if (error) {
                         console.error(`exec error: ${error}`);
                         return;
@@ -1260,26 +1083,24 @@ module.exports = function run(code, file, code2) {
                     }
                 });
             } else if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "title") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["type"] === "IDENTIFIER") {
-                            var value = variable[tok[i][4]["value"]];
-                        } else {
-                            var value = tok[i][4]["value"];
-                        }
-                        fs.writeFileSync("./LuxScript/Transfer/transferTitle.lxt", value);
+                if (tok[i][2]["value"] === "title" && tok[i][3]["value"] === "LEFT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        var value = variable[tok[i][4]["value"]];
+                    } else {
+                        var value = tok[i][4]["value"];
                     }
+                    fs.writeFileSync("./LuxScript/Transfer/transferTitle.lxt", value);
                 }
-                if (tok[i][2]["value"] === "icon") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["type"] === "IDENTIFIER") {
-                            var value = variable[tok[i][4]["value"]];
-                        } else {
-                            var value = tok[i][4]["value"];
-                        }
-                        fs.writeFileSync("./LuxScript/Transfer/transferLogo.lxt", value);
+                if (tok[i][2]["value"] === "icon" && tok[i][3]["value"] === "LEFT_PAREN") {
+                    if (tok[i][4]["type"] === "IDENTIFIER") {
+                        var value = variable[tok[i][4]["value"]];
+                    } else {
+                        var value = tok[i][4]["value"];
                     }
+                    fs.writeFileSync("./LuxScript/Transfer/transferLogo.lxt", value);
                 }
+            } else {
+                fs.writeFileSync("./LuxScript/Transfer/transferLogo.lxt", "");
             }
         }
 
@@ -1301,26 +1122,22 @@ module.exports = function run(code, file, code2) {
                         console.error(stderr);
                     }
                 });
-            } else if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "run") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["type"] === "IDENTIFIER") {
-                            tok[i][4]["value"] = variable[tok[i][4]["value"]];
-                        }
-                        exec("python -c " + tok[i][4]["value"], (error, stdout, stderr) => {
-                            if (error) {
-                                console.error(`exec error: ${error}`);
-                                return;
-                            }
-                            if (stdout) {
-                                console.log(stdout);
-                            }
-                            if (stderr) {
-                                console.error(stderr);
-                            }
-                        });
-                    }
+            } else if (tok[i][1]["value"] === "DOT" && tok[i][2]["value"] === "run" && tok[i][3]["value"] === "LEFT_PAREN") {
+                if (tok[i][4]["type"] === "IDENTIFIER") {
+                    tok[i][4]["value"] = variable[tok[i][4]["value"]];
                 }
+                exec("python -c " + tok[i][4]["value"], (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`exec error: ${error}`);
+                        return;
+                    }
+                    if (stdout) {
+                        console.log(stdout);
+                    }
+                    if (stderr) {
+                        console.error(stderr);
+                    }
+                });
             }
         }
 
@@ -1342,41 +1159,31 @@ module.exports = function run(code, file, code2) {
                         console.error(stderr);
                     }
                 });
-            } else if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "run") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][4]["type"] === "IDENTIFIER") {
-                            tok[i][4]["value"] = variable[tok[i][4]["value"]];
-                        }
-                        exec("node -e " + tok[i][4]["value"], (error, stdout, stderr) => {
-                            if (error) {
-                                console.error(`exec error: ${error}`);
-                                return;
-                            }
-                            if (stdout) {
-                                console.log(stdout);
-                            }
-                            if (stderr) {
-                                console.error(stderr);
-                            }
-                        });
-                    }
+            } else if (tok[i][1]["value"] === "DOT" && tok[i][2]["value"] === "run" && tok[i][3]["value"] === "LEFT_PAREN") {
+                if (tok[i][4]["type"] === "IDENTIFIER") {
+                    tok[i][4]["value"] = variable[tok[i][4]["value"]];
                 }
+                exec("node -e " + tok[i][4]["value"], (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`exec error: ${error}`);
+                        return;
+                    }
+                    if (stdout) {
+                        console.log(stdout);
+                    }
+                    if (stderr) {
+                        console.error(stderr);
+                    }
+                });
             }
         }
 
         // Json
-        if (tok[i][0]["value"] === "json") {
-            if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "parse") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        variable[tok[i][4]["value"]] = JSON.parse(variable[tok[i][4]["value"]]);
-                    }
-                } else if (tok[i][2]["value"] === "stringify") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        variable[tok[i][4]["value"]] = JSON.stringify(variable[tok[i][4]["value"]]);
-                    }
-                }
+        if (tok[i][0]["value"] === "json" && tok[i][1]["value"] === "DOT") {
+            if (tok[i][2]["value"] === "parse" && tok[i][3]["value"] === "LEFT_PAREN") {
+                variable[tok[i][4]["value"]] = JSON.parse(variable[tok[i][4]["value"]]);
+            } else if (tok[i][2]["value"] === "stringify" && tok[i][3]["value"] === "LEFT_PAREN") {
+                variable[tok[i][4]["value"]] = JSON.stringify(variable[tok[i][4]["value"]]);
             }
         }
 
@@ -1410,12 +1217,8 @@ module.exports = function run(code, file, code2) {
         }
 
         // Exit
-        if (tok[i][0]["value"] === "exit") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                if (tok[i][2]["value"] !== "") {
-                    process.exit(tok[i][2]["value"]);
-                }
-            }
+        if (tok[i][0]["value"] === "exit" && tok[i][1]["value"] === "LEFT_PAREN" && tok[i][2]["value"] !== "") {
+            process.exit(tok[i][2]["value"]);
         }
 
         // Calc
@@ -1439,126 +1242,93 @@ module.exports = function run(code, file, code2) {
         }
 
         // Whido
-        if (tok[i][0]["value"] === "WHIDO") {
-            if (tok[i][1]["value"] === "LEFT_PAREN") {
-                let [, , ...insideWhile] = tok[i];
-                insideWhile.pop();
-                insideWhile.pop();
-                insideWhile.pop();
-                insideWhile.pop();
-                insideWhile.pop();
-                insideWhile.pop();
-                if (tok[i][6]["value"] === "LEFT_BRACE") {
-                    let insideBrace = tok[i];
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    insideBrace.shift();
-                    do {
-                        run(untokenize(insideBrace))
-                    } while (untokenize(insideWhile))
-                }
+        if (tok[i][0]["value"] === "WHIDO" && tok[i][1]["value"] === "LEFT_PAREN") {
+            let [, , ...insideWhile] = tok[i];
+            insideWhile.pop();
+            insideWhile.pop();
+            insideWhile.pop();
+            insideWhile.pop();
+            insideWhile.pop();
+            insideWhile.pop();
+            if (tok[i][6]["value"] === "LEFT_BRACE") {
+                let insideBrace = tok[i];
+                insideBrace.shift();
+                insideBrace.shift();
+                insideBrace.shift();
+                insideBrace.shift();
+                insideBrace.shift();
+                insideBrace.shift();
+                insideBrace.shift();
+                do {
+                    run(untokenize(insideBrace))
+                } while (untokenize(insideWhile))
             }
         }
 
         // File
-        if (tok[i][0]["value"] === "file") {
-            if (tok[i][1]["value"] === "DOT") {
-                if (tok[i][2]["value"] === "read") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][5]["value"] === "COMMA") {
-                            if (tok[i][6]["value"] === "DEF") {
-                                if (tok[i][7]["value"] === "LEFT_PAREN") {
-                                    var name = tok[i][8]["value"];
-                                    if (fs.existsSync(tok[i][4]["value"])) {
-                                        var data = fs.readFileSync(tok[i][4]["value"], "utf8");
-                                        variable[name] = data;
-                                    } else {
-                                        error[14]();
-                                        return false;
-                                    }
-                                }
-                            }
-                        }
-                    }
+        if (tok[i][0]["value"] === "file" && tok[i][1]["value"] === "DOT") {
+            if (tok[i][2]["value"] === "read" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][5]["value"] === "COMMA" && tok[i][6]["value"] === "DEF" && tok[i][7]["value"] === "LEFT_PAREN") {
+                var name = tok[i][8]["value"];
+                if (fs.existsSync(tok[i][4]["value"])) {
+                    var data = fs.readFileSync(tok[i][4]["value"], "utf8");
+                    variable[name] = data;
+                } else {
+                    error[14]();
+                    return false;
                 }
-                if (tok[i][2]["value"] === "write") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][5]["value"] === "COMMA") {
-                            if (fs.existsSync(tok[i][4]["value"])) {
-                                fs.writeFileSync(tok[i][4]["value"], tok[i][6]["value"]);
-                            } else {
-                                error[15]();
-                                return false;
-                            }
-                        }
-                    }
+            } else if (tok[i][2]["value"] === "write" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][5]["value"] === "COMMA") {
+                if (fs.existsSync(tok[i][4]["value"])) {
+                    fs.writeFileSync(tok[i][4]["value"], tok[i][6]["value"]);
+                } else {
+                    error[15]();
+                    return false;
                 }
-                if (tok[i][2]["value"] === "mkdir") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (fs.existsSync(tok[i][4]["value"])) {
-                            error[16]();
-                            return false;
-                        } else {
-                            fs.mkdirSync(tok[i][4]["value"]);
-                        }
-                    }
+            }
+            if (tok[i][2]["value"] === "mkdir" && tok[i][3]["value"] === "LEFT_PAREN") {
+                if (fs.existsSync(tok[i][4]["value"])) {
+                    error[16]();
+                    return false;
+                } else {
+                    fs.mkdirSync(tok[i][4]["value"]);
                 }
-                if (tok[i][2]["value"] === "rmfile") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (fs.existsSync(tok[i][4]["value"])) {
-                            fs.unlinkSync(tok[i][4]["value"]);
-                        } else {
-                            error[17]();
-                        }
-                    }
+            }
+            if (tok[i][2]["value"] === "rmfile" && tok[i][3]["value"] === "LEFT_PAREN") {
+                if (fs.existsSync(tok[i][4]["value"])) {
+                    fs.unlinkSync(tok[i][4]["value"]);
+                } else {
+                    error[17]();
                 }
-                if (tok[i][2]["value"] === "rmdir") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (fs.existsSync(tok[i][4]["value"])) {
-                            fs.rmdirSync(tok[i][4]["value"]);
-                        } else {
-                            error[18]();
-                        }
-                    }
+            }
+            if (tok[i][2]["value"] === "rmdir" && tok[i][3]["value"] === "LEFT_PAREN") {
+                if (fs.existsSync(tok[i][4]["value"])) {
+                    fs.rmdirSync(tok[i][4]["value"]);
+                } else {
+                    error[18]();
                 }
-                if (tok[i][2]["value"] === "scan") {
-                    if (tok[i][3]["value"] === "LEFT_PAREN") {
-                        if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                            fs.stat(tok[i][4]["value"], function(err, stat) {
-                                if (err == null) {
-                                    return console.log(true);
-                                } else if (err.code === 'ENOENT') {
-                                    return console.log(false);
-                                } else {
-                                    error[4]();
-                                    return false;
-                                }
-                            });
-                        }
+            }
+            if (tok[i][2]["value"] === "scan" && tok[i][3]["value"] === "LEFT_PAREN" && tok[i][5]["value"] === "RIGHT_PAREN") {
+                fs.stat(tok[i][4]["value"], function(err, stat) {
+                    if (err == null) {
+                        return console.log(true);
+                    } else if (err.code === 'ENOENT') {
+                        return console.log(false);
+                    } else {
+                        error[4]();
+                        return false;
                     }
-                }
+                });
             }
         }
 
         // While statement
         function whileState() {
-            if (tok[i][0]["value"] === "WHILE") {
-                if (tok[i][1]["value"] === "LEFT_PAREN") {
-                    if (tok[i][3]["value"] === "EQUALS") {
-                        while (tok[i][2]["value"] === (tok[i][4] && tok[i][4]["value"])) {
-                            if (tok[i][5]["value"] === "RIGHT_PAREN") {
-                                if (tok[i][6]["value"] === "LEFT_BRACE") {
-                                    const index = tok[i].findIndex((token) => token["value"] === "LEFT_BRACE");
-                                    const remainingTokens = tok[i].slice(index + 1);
-                                    tok[i] = remainingTokens;
-                                    run(untokenize(tok[i]));
-                                }
-                            }
-                        }
+            if (tok[i][0]["value"] === "WHILE" && tok[i][1]["value"] === "LEFT_PAREN" && tok[i][3]["value"] === "EQUALS") {
+                while (tok[i][2]["value"] === (tok[i][4] && tok[i][4]["value"])) {
+                    if (tok[i][5]["value"] === "RIGHT_PAREN" && tok[i][6]["value"] === "LEFT_BRACE") {
+                        const index = tok[i].findIndex((token) => token["value"] === "LEFT_BRACE");
+                        const remainingTokens = tok[i].slice(index + 1);
+                        tok[i] = remainingTokens;
+                        run(untokenize(tok[i]));
                     }
                 }
             }
@@ -1605,13 +1375,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1643,13 +1411,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1662,13 +1428,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1681,13 +1445,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1700,13 +1462,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1719,13 +1479,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
@@ -1738,13 +1496,11 @@ module.exports = function run(code, file, code2) {
                         run(untokenize(input));
                     } else {
                         for (let ei = 0; ei < elseTok.length; ei++) {
-                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE") {
-                                if (elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
-                                    let value = elseTok[ei]
-                                    value = value.slice(3);
-                                    run(untokenize(value));
-                                    break;
-                                }
+                            if (elseTok[ei][0]["value"] === "RIGHT_BRACE" && elseTok[ei][1] && elseTok[ei][1]["value"] === "ELSE") {
+                                let value = elseTok[ei]
+                                value = value.slice(3);
+                                run(untokenize(value));
+                                break;
                             }
                         }
                     }
